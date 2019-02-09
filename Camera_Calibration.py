@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 import glob
 import math as m
+import sys
 
 import undisort_images as ui
 
@@ -13,7 +14,7 @@ def main():
 	# - mm
 	dimension = 30
 
-	cam_type = 1
+	cam_type = 2
 
 	imageType = '.jpg'
 	#------------------------------------------
@@ -21,9 +22,15 @@ def main():
 
 	if cam_type == 0:
 		version, filt = '1', (5,5)
+		working_folder = 'Calib_Photos_v'+version +'/'
 	elif cam_type == 1:
 		version, filt = '640x480', (5,5)
-	working_folder = 'Calib_Photos_v'+version +'/'
+		working_folder = 'Calib_Photos_FE_v'+version +'/'
+	elif cam_type == 2:
+		version, filt = '752x480', (11,11)
+		working_folder = 'Calib_Photos_FE_v'+version +'/'
+	
+
 
 	# termination criteria
 	criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, dimension, .1)
@@ -83,6 +90,10 @@ def main():
 	elif cam_type == 1:
 		mtx, dist, undistoted_img = ui.undisort_fish_eye(objpoints, imgpoints, img)
 		path_cam_data = 'Fisheye_Data/'
+	elif cam_type == 2:
+		mtx, dist, undistoted_img = ui.undisort_fish_eye_2(objpoints, imgpoints, img)
+		path_cam_data = 'Fisheye_Data_2/'
+
 
 	# save resuts in a .txt file
 	filename = path_cam_data+'Camera_Matrix_v'+version+'.txt'

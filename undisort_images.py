@@ -65,11 +65,50 @@ def undisort_fish_eye(objpoints, imgpoints, img):
 
 	return mtx, dist, undistorted_img
 
+def undisort_fish_eye_2(objpoints, imgpoints, img):
+	calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC+cv2.fisheye.CALIB_CHECK_COND+cv2.fisheye.CALIB_FIX_SKEW
+	criteria = (cv2.TERM_CRITERIA_EPS+cv2.TERM_CRITERIA_MAX_ITER, 30, 1e-6)
+
+	h,  w = img.shape[:2]
+	nb_img = len(objpoints)
+	mtx = np.zeros((3,3))
+	dist = np.zeros((4,1))
+	rvecs = [np.zeros((1,1,3), dtype=np.float64) for i in range(nb_img)]
+	tvecs = [np.zeros((1,1,3), dtype=np.float64) for i in range(nb_img)]
+	rms,_,_,_,_ = cv2.fisheye.calibrate(objpoints, imgpoints, (w, h), mtx, dist, rvecs, tvecs, calibration_flags, criteria)
+	
+	# Undistort an image
+	balance = 1
+	dim1 = img.shape[:2][::-1]
+	dim2 = (int(dim1[0]/1.1), int(dim1[1]/1.1))
+	dim3 = (int(dim1[0]/1), int(dim1[1]/1))
+   
+
+	if dim2 == None:
+		dim2 = dim1
+	if dim3 == None:
+		dim3 = dim1
+
+	
+	scaled_mtx = mtx * dim1[0] / w
+	scaled_mtx[2][2] = 1
+   
+	new_mtx = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(scaled_mtx, dist, dim2, np.eye(3), balance=balance)
+	mapx,mapy = cv2.fisheye.initUndistortRectifyMap(scaled_mtx,dist,np.eye(3),new_mtx,dim3,cv2.CV_16SC2)
+	undistorted_img = cv2.remap(img,mapx,mapy,interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+
+	print('Calibration Matrix: ')
+	print(mtx)
+	print('Disortion: ')
+	print(np.transpose(dist))
+
+	return mtx, dist, undistorted_img
+
 # crop image
 def crop(img, h_dim, w_dim):
 	w, h, l = img.shape
 	img = img[h_dim[0]:h_dim[1],w_dim[0]:w_dim[1],:l]
-	Resize the image
+	# Resize the image
 	img = cv2.resize(img, (h, w))
 
 	
