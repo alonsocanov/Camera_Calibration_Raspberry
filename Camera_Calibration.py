@@ -3,119 +3,103 @@ import cv2
 import glob
 import math as m
 
-#---------------------- SET THE PARAMETERS
-nRows = 9
-nCols = 6
-# - mm
-dimension = 25
-#version, filt = '720x480', (5, 5)
-version, filt = '1', (5, 5)
-workingFolder = 'Calib_Photos_v'+version +'/'
-#workingFolder = 'Calib_Photos_FE_v'+version +'/'
+import undisort_images as ui
 
-imageType = '.jpg'
-#------------------------------------------
-print('Camera Calibration')
-# termination criteria
-criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, dimension, 0.001)
+def main():
+	#---------------------- SET THE PARAMETERS
+	show_fig = 0
+	nRows = 9
+	nCols = 6
+	# - mm
+	dimension = 30
 
-# prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
-objp = np.zeros((nCols*nRows, 3), np.float32)
-objp[:, : 2] = np.mgrid[0:nCols, 0:nRows].T.reshape(-1, 2)
+	cam_type = 1
 
-# Arrays to store object points and image points from all the images.
-# 3d point in real world space
-objpoints = []
-# 2d points in image plane.
-imgpoints = []
-# working directory od images
-filename = workingFolder + 'im*' + imageType
-print ('Looking in folder ', filename)
-# all images obtention
-images = glob.glob(filename)
+	imageType = '.jpg'
+	#------------------------------------------
+	print('Camera Calibration')
 
-imgNotGood = None
+	if cam_type == 0:
+		version, filt = '1', (5,5)
+	elif cam_type == 1:
+		version, filt = '640x480', (5,5)
+	working_folder = 'Calib_Photos_v'+version +'/'
 
-print ('Number of images provided: ', len(images))
-if len(images) < 9:
-    print ('Not enough images were found: at least 9 images must be provided')
-    sys.exit()
+	# termination criteria
+	criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, dimension, .1)
+	# prepare object points
+	objp = np.zeros((1,nCols*nRows, 3), np.float32)
+	objp[0,:,:2] = np.mgrid[0:nCols, 0:nRows].T.reshape(-1, 2)
 
-for fname in images:
-	# Read Image
-    img = cv2.imread(fname)
-    # Image dimentions 
-    w, h, l = img.shape
-    # Crop Image
-    img = img[50:h,150:w,:l]
-    # Resize the image
-    img = cv2.resize(img, (h, w))
-    # cv2.imshow('img',img)
-    # cv2.waitKey(500)
-    # convert to gray scale
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # Find the chess board corners
-    ret, corners = cv2.findChessboardCorners(gray, (nCols, nRows), None)
-    # If found, add object points, image points (after refining them)
-    if ret:
-        objpoints.append(objp)
-        corners2 = cv2.cornerSubPix(gray, corners, filt, (-1, -1), criteria)
-        imgpoints.append(corners2)
-        # Draw and display the corners
-        # img = cv2.drawChessboardCorners(img, (nCols, nRows), corners2, ret)
-        # cv2.imshow('img', img)
-        # cv2.waitKey(500)
-        if imgNotGood == None:
-            imgNotGood = fname
-    else:
-        imgNotGood = fname
+	# Arrays to store object points and image points from all the images.
+	# 3d point in real world space
+	objpoints = []
+	# 2d points in image plane.
+	imgpoints = []
+	# working directory od images
+	filename = working_folder + 'im*' + imageType
+	print ('Looking in folder ', filename)
+	# all images obtention
+	images = glob.glob(filename)
 
-print('Number of useful images: ', len(objpoints))
-cv2.destroyAllWindows()
+	img_bad = None
 
-if len(objpoints) > 1:
-    ret, mtx, dist, _, _ = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1],None,None)
-    # Undistort an image
-    img = cv2.imread(imgNotGood)
-    #cv2.imshow('Disorted Image', img)
-    #cv2.waitKey(500)
-    h,  w = img.shape[:2]
-    new_mtx, roi = cv2.getOptimalNewCameraMatrix(mtx,dist,(w,h),1,(w,h))
-    undistoted_img = cv2.undistort(img, mtx, dist, None, new_mtx)
-    # Crop image
-    x,y,w,h = roi
-    undistoted_img = undistoted_img[y:y+h, x:x+w]
-    print ('ROI: ', roi)
-    print('Calibration Matrix: ')
-    print(mtx)
-    print('New Camera Martrix:')
-    print(new_mtx)
-    print('Disortion: ')
-    print(dist)
+	print ('Provided images: ', len(images))
+	if len(images) < 9:
+		print ('Not enough images were found: at least 9 images must be provided')
+		sys.exit()
 
-    #--------- Save result
-    filename = 'Camera_Data/Camera_Matrix_v'+version+'.txt'
-    np.savetxt(filename, mtx, delimiter=',')
-    filename = 'Camera_Data/Camera_new_Matrix_v'+version+'.txt'
-    np.savetxt(filename, new_mtx, delimiter=',')
-    filename = 'Camera_Data/Camera_Distortion_v'+version+'.txt'
-    np.savetxt(filename, dist, delimiter=',')
+	for fname in images:
+		# Read Image
+		img = cv2.imread(fname)
+		# convert to gray scale
+		gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+		# Find the chess board corners
+		ret, corners = cv2.findChessboardCorners(gray, (nCols, nRows), cv2.CALIB_CB_ADAPTIVE_THRESH+cv2.CALIB_CB_FAST_CHECK+cv2.CALIB_CB_NORMALIZE_IMAGE)
+		# If found, add object points, image points (after refining them)
+		if ret:
+			objpoints.append(objp)
+			corners2 = cv2.cornerSubPix(gray, corners, filt, (-1, -1), criteria)
+			imgpoints.append(corners2)
+			# Draw and display the corners
+			if show_fig:
+				img = cv2.drawChessboardCorners(img, (nCols, nRows), corners2, ret)
+				cv2.imshow('img', img)
+				cv2.waitKey(500)
+			if img_bad == None:
+				img_bad = fname
+		else:
+			img_bad = fname
 
-    # Distortion Error
-    mean_error = 0
-    for i in range(len(objpoints)):
-        imgpoints2, _ = cv2.projectPoints(objpoints[i], rvecs[i], tvecs[i], mtx, dist)
-        error = cv2.norm(imgpoints[i],imgpoints2, cv2.NORM_L2)/len(imgpoints2)
-        mean_error += error
+	cv2.destroyAllWindows()
 
-    print('Total Error: ', mean_error/len(objpoints))
+	# read image
+	img = cv2.imread(img_bad)
+	print('Useful images: ', len(objpoints))
+	print('Image dimension: ', img.shape[:2])
+	if cam_type == 0:
+		mtx, dist, undistoted_img = ui.udisort_normal(objpoints, imgpoints, img)
+		path_cam_data = 'Camera_Data/'
+	elif cam_type == 1:
+		mtx, dist, undistoted_img = ui.undisort_fish_eye(objpoints, imgpoints, img)
+		path_cam_data = 'Fisheye_Data/'
 
-    cv2.imshow('Undisorted Image', undistoted_img)
-    key = cv2.waitKey(1) & 0xFF
-    while key != ord('q'):
-        key = cv2.waitKey(1) & 0xFF
+	# save resuts in a .txt file
+	filename = path_cam_data+'Camera_Matrix_v'+version+'.txt'
+	np.savetxt(filename, mtx, delimiter=',')
+	filename = path_cam_data+'Camera_Distortion_v'+version+'.txt'
+	np.savetxt(filename, np.transpose(dist), delimiter=',')
 
-else:
-    print('In order to calibrate you need at least 9 good pictures... try again')
 
-print('End of Camera Calibration')
+	
+
+	cv2.imshow('Undisorted Image', undistoted_img)
+	# stop program by typing 'q'
+	key = cv2.waitKey(1) & 0xFF
+	while key != ord('q'):
+		key = cv2.waitKey(1) & 0xFF
+
+	print('End of Camera Calibration')
+
+if __name__ == '__main__':
+	main()
